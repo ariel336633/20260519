@@ -76,22 +76,19 @@ function draw() {
 }
 
 function drawHandLines(hand, w, h) {
-  // 將偵測座標映射到畫布上的影像大小 (影像預設 640x480)
-  let sx = w / 640;
-  let sy = h / 480;
-  let offsetX = -w / 2;
-  let offsetY = -h / 2;
-
-  // 繪製關節點
   for (let kp of hand.keypoints) {
-    fill(255, 0, 0);
+    // 5. 使用 map 精確轉換座標，確保線條對齊手部
+    let x = map(kp.x, 0, capture.width, -w/2, w/2);
+    let y = map(kp.y, 0, capture.height, -h/2, h/2);
+    
+    fill(0, 255, 0);
     noStroke();
-    ellipse(offsetX + kp.x * sx, offsetY + kp.y * sy, 8);
+    ellipse(x, y, 10);
   }
   
   // 繪製手指連線
-  stroke(255);
-  strokeWeight(2);
+  stroke(0, 255, 0);
+  strokeWeight(3);
   noFill();
   let fingers = [
     [0, 1, 2, 3, 4],    // 拇指
@@ -103,7 +100,9 @@ function drawHandLines(hand, w, h) {
   for (let f of fingers) {
     beginShape();
     for (let idx of f) {
-      vertex(offsetX + hand.keypoints[idx].x * sx, offsetY + hand.keypoints[idx].y * sy);
+      let x = map(hand.keypoints[idx].x, 0, capture.width, -w/2, w/2);
+      let y = map(hand.keypoints[idx].y, 0, capture.height, -h/2, h/2);
+      vertex(x, y);
     }
     endShape();
   }
