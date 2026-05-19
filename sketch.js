@@ -10,8 +10,9 @@ let isModelReady = false;
 
 function preload() {
   // 載入 ml5.js 手部追蹤模型
-  // 設定為 flipped: true，模型會自動回傳符合鏡像畫面的座標
-  handPose = ml5.handPose({ flipped: true }, () => {
+  // 修正：設定為 flipped: false，由我們在 draw 裡面統一處理鏡像
+  // 這樣能確保座標點位與翻轉後的影像完美重合
+  handPose = ml5.handPose({ flipped: false }, () => {
     console.log("模型載入完成");
     isModelReady = true;
   });
@@ -54,21 +55,23 @@ function draw() {
   let h = height * 0.6;
 
   push();
-  // 1. 移至畫布中心
+  // 移至畫布中心
   translate(width / 2, height / 2);
   
-  // 2. 繪製攝影機影像（僅在此處翻轉以達到鏡像效果）
+  // 建立一個統一的鏡像區域，同時包含影像與手部線條
   push();
-  scale(-1, 1);
+  scale(-1, 1); // 這裡處理左右鏡像
   imageMode(CENTER);
   image(capture, 0, 0, w, h);
-  pop();
 
-  // 3. 繪製手部骨架
-  // 因為 preload 已設定 flipped: true，座標已經與鏡像影像對齊，直接繪製即可
+  // 繪製手部骨架（在鏡像座標系內繪製，線條方向就會正確）
   if (isModelReady && hands && hands.length > 0) {
     drawHandLines(hands[0], w, h);
-    
+  }
+  pop(); // 結束鏡像區域，接下來的文字就不會被反轉
+
+  // 處理遊戲邏輯（判斷手勢不影響繪圖方向）
+  if (isModelReady && hands && hands.length > 0) {
     if (gameState === "WAITING") {
       let gesture = detectGesture(hands[0]);
       if (gesture) {
