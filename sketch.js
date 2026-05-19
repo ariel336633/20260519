@@ -10,7 +10,8 @@ let isModelReady = false;
 
 function preload() {
   // 載入 ml5.js 手部追蹤模型
-  handPose = ml5.handPose({ flipped: true }, () => {
+  // 修正：flipped 設為 false，因為 draw 裡面已經有 scale(-1, 1) 做鏡像了
+  handPose = ml5.handPose({ flipped: false }, () => {
     console.log("模型載入完成");
     isModelReady = true;
   });
@@ -19,9 +20,15 @@ function preload() {
 function setup() {
   createCanvas(windowWidth, windowHeight);
   
-  // 擷取攝影機影像
-  capture = createCapture(VIDEO);
-  capture.size(640, 480);
+  // 修正：針對手機優化，強制使用前鏡頭並根據視窗調整大小
+  let constraints = {
+    video: {
+      facingMode: "user"
+    },
+    audio: false
+  };
+  capture = createCapture(constraints);
+  capture.size(VIDEO.width, VIDEO.height);
   // 隱藏預設產生的 HTML 影片元件，我們要在畫布上自行繪製
   capture.hide();
 
@@ -35,12 +42,11 @@ function setup() {
 
 function draw() {
   background('lightblue');
-
-  // 如果模型還沒準備好或攝影機還沒啟動，顯示載入文字
-  if (!isModelReady || capture.width === 0) {
+  
+  // 檢查攝影機是否已啟動
+  if (capture.width === 0) {
     fill(0);
-    textSize(24);
-    text("攝影機或 AI 模型載入中...", width / 2, height / 2);
+    text("攝影機啟動中...", width / 2, height / 2);
     return;
   }
 
@@ -50,8 +56,7 @@ function draw() {
   push();
   // 移至中心
   translate(width / 2, height / 2);
-  
-  // 這裡我們只處理畫面鏡像顯示，因為 detectStart 已經在模型設定中處理了 flipped
+  // 處理左右鏡像
   scale(-1, 1);
   
   imageMode(CENTER);
@@ -61,7 +66,7 @@ function draw() {
   if (hands.length > 0) {
     drawHandLines(hands[0], w, h);
     
-    // 遊戲邏輯：若在等待狀態且偵測到穩定手勢，則觸發 AI 出拳
+    // 遊戲邏輯
     if (gameState === "WAITING") {
       let gesture = detectGesture(hands[0]);
       if (gesture) {
@@ -69,6 +74,12 @@ function draw() {
         playGame(playerGesture);
       }
     }
+  } else if (!isModelReady) {
+    push();
+    scale(-1, 1); // 將文字轉回正向
+    fill(0);
+    text("AI 模型載入中...", 0, 0);
+    pop();
   }
   pop();
 
@@ -111,10 +122,11 @@ function drawHandLines(hand, w, h) {
 function detectGesture(hand) {
   let k = hand.keypoints;
   // 簡易邏輯：判斷指尖(Tip)是否高於指根關節(PIP)
-  let indexUp = k[8].y < k[6].y;
-  let middleUp = k[12].y < k[10].y;
-  let ringUp = k[16].y < k[14].y;
-  let pinkyUp = k[20].y < k[18].y;
+  // 注意：y 座標越小代表位置越高
+  let indexUp = k[8].y < k[5].y;
+  let middleUp = k[12].y < k[9].y;
+  let ringUp = k[16].y < k[13].y;
+  let pinkyUp = k[20].y < k[17].y;
   
   // 手勢辨識判斷
   if (indexUp && middleUp && ringUp && pinkyUp) return "布";
@@ -142,18 +154,18 @@ function playGame(player) {
 
 function displayUI() {
   fill(0);
-  textSize(32);
+  textSize(height * 0.04);
   text(`玩家出拳: ${playerGesture || "偵測中..."}`, width / 2, height * 0.85);
   
   if (gameState === "FINISHED") {
     fill(255, 0, 0);
-    textSize(50);
+    textSize(height * 0.06);
     text(`AI 出拳: ${aiGesture}`, width / 2, height * 0.1);
-    textSize(80);
+    textSize(height * 0.1);
     text(resultText, width / 2, height / 2);
     
     fill(50);
-    textSize(20);
+    textSize(height * 0.03);
     text("按下任意鍵重新開始", width / 2, height * 0.95);
   } else {
     fill(0);
