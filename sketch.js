@@ -10,9 +10,9 @@ let isModelReady = false;
 
 function preload() {
   // 載入 ml5.js 手部追蹤模型
-  // 修正：設定為 flipped: false，由我們在 draw 裡面統一處理鏡像
-  // 這樣能確保座標點位與翻轉後的影像完美重合
-  handPose = ml5.handPose({ flipped: false }, () => {
+  // 1. 重要修正：這裡開啟 flipped: true
+  // 這會讓 ml5 回傳的座標直接與「鏡像後」的畫面對齊
+  handPose = ml5.handPose({ flipped: true }, () => {
     console.log("模型載入完成");
     isModelReady = true;
   });
@@ -24,12 +24,14 @@ function setup() {
   let constraints = {
     video: {
       facingMode: "user",
+      width: { ideal: 640 },
+      height: { ideal: 480 }
     },
     audio: false
   };
 
   capture = createCapture(constraints, () => {
-    console.log("攝影機已就緒");
+    console.log("攝影機啟動完成");
   });
   capture.hide();
 
@@ -55,23 +57,21 @@ function draw() {
   let h = height * 0.6;
 
   push();
-  // 移至畫布中心
   translate(width / 2, height / 2);
   
-  // 建立一個統一的鏡像區域，同時包含影像與手部線條
+  // 2. 只有「影像」需要手動鏡像翻轉
   push();
-  scale(-1, 1); // 這裡處理左右鏡像
+  scale(-1, 1); 
   imageMode(CENTER);
   image(capture, 0, 0, w, h);
+  pop();
 
-  // 繪製手部骨架（在鏡像座標系內繪製，線條方向就會正確）
+  // 3. 繪製骨架與遊戲邏輯
+  // 這裡不執行 scale(-1, 1)，因為 ml5 的 flipped: true 座標已經與影像對齊
   if (isModelReady && hands && hands.length > 0) {
+    // 繪製線條
     drawHandLines(hands[0], w, h);
-  }
-  pop(); // 結束鏡像區域，接下來的文字就不會被反轉
-
-  // 處理遊戲邏輯（判斷手勢不影響繪圖方向）
-  if (isModelReady && hands && hands.length > 0) {
+    
     if (gameState === "WAITING") {
       let gesture = detectGesture(hands[0]);
       if (gesture) {
@@ -91,10 +91,10 @@ function draw() {
 
 function drawHandLines(hand, w, h) {
   for (let kp of hand.keypoints) {
-    // 使用 capture 的實際解析度進行映射，確保在手機直式時也能對齊
-    // 因為影像在 draw 中被置中，所以座標範圍是 -w/2 到 w/2
-    let x = map(kp.x, 0, capture.width, -w/2, w/2);
-    let y = map(kp.y, 0, capture.height, -h/2, h/2);
+    // 4. 動態映射：根據 capture 的實際寬高轉換座標
+    // 即使手機旋轉，capture.width 也能反映真實數據
+    let x = map(kp.x, 0, capture.width, -w / 2, w / 2);
+    let y = map(kp.y, 0, capture.height, -h / 2, h / 2);
     
     fill(0, 255, 0);
     noStroke();
@@ -115,8 +115,8 @@ function drawHandLines(hand, w, h) {
   for (let f of fingers) {
     beginShape();
     for (let idx of f) {
-      let x = map(hand.keypoints[idx].x, 0, capture.width, -w/2, w/2);
-      let y = map(hand.keypoints[idx].y, 0, capture.height, -h/2, h/2);
+      let x = map(hand.keypoints[idx].x, 0, capture.width, -w / 2, w / 2);
+      let y = map(hand.keypoints[idx].y, 0, capture.height, -h / 2, h / 2);
       vertex(x, y);
     }
     endShape();
