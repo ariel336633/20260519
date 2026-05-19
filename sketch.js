@@ -6,10 +6,14 @@ let aiGesture = "";
 let resultText = "請出拳 (石頭、剪刀、布)";
 let gameState = "WAITING"; // "WAITING" 或 "FINISHED"
 let choices = ["石頭", "剪刀", "布"];
+let isModelReady = false;
 
 function preload() {
   // 載入 ml5.js 手部追蹤模型
-  handPose = ml5.handPose();
+  handPose = ml5.handPose({ flipped: true }, () => {
+    console.log("模型載入完成");
+    isModelReady = true;
+  });
 }
 
 function setup() {
@@ -32,12 +36,22 @@ function setup() {
 function draw() {
   background('lightblue');
 
+  // 如果模型還沒準備好或攝影機還沒啟動，顯示載入文字
+  if (!isModelReady || capture.width === 0) {
+    fill(0);
+    textSize(24);
+    text("攝影機或 AI 模型載入中...", width / 2, height / 2);
+    return;
+  }
+
   let w = width * 0.6;
   let h = height * 0.6;
 
   push();
-  // 修正左右顛倒：移至中心並進行水平翻轉
+  // 移至中心
   translate(width / 2, height / 2);
+  
+  // 這裡我們只處理畫面鏡像顯示，因為 detectStart 已經在模型設定中處理了 flipped
   scale(-1, 1);
   
   imageMode(CENTER);
