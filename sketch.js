@@ -20,16 +20,19 @@ function preload() {
 function setup() {
   createCanvas(windowWidth, windowHeight);
   
-  // 修正：針對手機優化，強制使用前鏡頭並根據視窗調整大小
   let constraints = {
     video: {
-      facingMode: "user"
+      facingMode: "user",
+      width: 640,
+      height: 480
     },
     audio: false
   };
-  capture = createCapture(constraints);
-  capture.size(VIDEO.width, VIDEO.height);
-  // 隱藏預設產生的 HTML 影片元件，我們要在畫布上自行繪製
+
+  capture = createCapture(constraints, () => {
+    console.log("攝影機已就緒");
+  });
+  capture.size(640, 480);
   capture.hide();
 
   // 開始偵測手部
@@ -54,15 +57,20 @@ function draw() {
   let h = height * 0.6;
 
   push();
-  // 移至中心
   translate(width / 2, height / 2);
-  // 處理左右鏡像
+  
+  // 先畫影像，處理左右鏡像
+  push();
   scale(-1, 1);
   
   imageMode(CENTER);
   image(capture, 0, 0, w, h);
+  pop();
 
-  // 繪製手部骨架並辨識手勢
+  // 繪製手部骨架（在 scale(-1, 1) 之外處理，或進入後統一處理）
+  // 這裡我們進入鏡像模式繪製，確保線條跟隨翻轉後的影像
+  push();
+  scale(-1, 1); 
   if (hands.length > 0) {
     drawHandLines(hands[0], w, h);
     
@@ -75,12 +83,11 @@ function draw() {
       }
     }
   } else if (!isModelReady) {
-    push();
-    scale(-1, 1); // 將文字轉回正向
+    scale(-1, 1); // 轉回正向文字
     fill(0);
     text("AI 模型載入中...", 0, 0);
-    pop();
   }
+  pop();
   pop();
 
   displayUI();
@@ -88,9 +95,9 @@ function draw() {
 
 function drawHandLines(hand, w, h) {
   for (let kp of hand.keypoints) {
-    // 5. 使用 map 精確轉換座標，確保線條對齊手部
-    let x = map(kp.x, 0, capture.width, -w/2, w/2);
-    let y = map(kp.y, 0, capture.height, -h/2, h/2);
+    // 使用 capture.width/height 確保比例正確
+    let x = map(kp.x, 0, 640, -w/2, w/2);
+    let y = map(kp.y, 0, 480, -h/2, h/2);
     
     fill(0, 255, 0);
     noStroke();
@@ -111,8 +118,8 @@ function drawHandLines(hand, w, h) {
   for (let f of fingers) {
     beginShape();
     for (let idx of f) {
-      let x = map(hand.keypoints[idx].x, 0, capture.width, -w/2, w/2);
-      let y = map(hand.keypoints[idx].y, 0, capture.height, -h/2, h/2);
+      let x = map(hand.keypoints[idx].x, 0, 640, -w/2, w/2);
+      let y = map(hand.keypoints[idx].y, 0, 480, -h/2, h/2);
       vertex(x, y);
     }
     endShape();
