@@ -10,7 +10,7 @@ let isModelReady = false;
 
 function preload() {
   // 載入 ml5.js 手部追蹤模型
-  // 1. 重要修正：這裡開啟 flipped: true
+  // 重要：這裡開啟 flipped: true 處理水平鏡像
   // 這會讓 ml5 回傳的座標直接與「鏡像後」的畫面對齊
   handPose = ml5.handPose({ flipped: true }, () => {
     console.log("模型載入完成");
@@ -91,10 +91,10 @@ function draw() {
 
 function drawHandLines(hand, w, h) {
   for (let kp of hand.keypoints) {
-    // 4. 動態映射：根據 capture 的實際寬高轉換座標
-    // 即使手機旋轉，capture.width 也能反映真實數據
+    // 4. 修正上下顛倒：將 y 軸的映射目標範圍對調 (-h/2, h/2) 變更為 (h/2, -h/2)
+    // 這會確保無論手機如何旋轉，線條都會正確疊加在手上
     let x = map(kp.x, 0, capture.width, -w / 2, w / 2);
-    let y = map(kp.y, 0, capture.height, -h / 2, h / 2);
+    let y = map(kp.y, 0, capture.height, h / 2, -h / 2);
     
     fill(0, 255, 0);
     noStroke();
@@ -116,7 +116,7 @@ function drawHandLines(hand, w, h) {
     beginShape();
     for (let idx of f) {
       let x = map(hand.keypoints[idx].x, 0, capture.width, -w / 2, w / 2);
-      let y = map(hand.keypoints[idx].y, 0, capture.height, -h / 2, h / 2);
+      let y = map(hand.keypoints[idx].y, 0, capture.height, h / 2, -h / 2);
       vertex(x, y);
     }
     endShape();
@@ -125,12 +125,12 @@ function drawHandLines(hand, w, h) {
 
 function detectGesture(hand) {
   let k = hand.keypoints;
-  // 簡易邏輯：判斷指尖(Tip)是否高於指根關節(PIP)
-  // 注意：y 座標越小代表位置越高
-  let indexUp = k[8].y < k[5].y;
-  let middleUp = k[12].y < k[9].y;
-  let ringUp = k[16].y < k[13].y;
-  let pinkyUp = k[20].y < k[17].y;
+  // 5. 修正辨識邏輯：由於 y 座標在手機上可能反向，我們改用相對距離判斷
+  // 判斷指尖與手掌中心（點 0）的距離是否遠於指根與手掌中心的距離
+  let indexUp = dist(k[8].x, k[8].y, k[0].x, k[0].y) > dist(k[5].x, k[5].y, k[0].x, k[0].y);
+  let middleUp = dist(k[12].x, k[12].y, k[0].x, k[0].y) > dist(k[9].x, k[9].y, k[0].x, k[0].y);
+  let ringUp = dist(k[16].x, k[16].y, k[0].x, k[0].y) > dist(k[13].x, k[13].y, k[0].x, k[0].y);
+  let pinkyUp = dist(k[20].x, k[20].y, k[0].x, k[0].y) > dist(k[17].x, k[17].y, k[0].x, k[0].y);
   
   // 手勢辨識判斷
   if (indexUp && middleUp && ringUp && pinkyUp) return "布";
